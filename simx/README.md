@@ -193,7 +193,7 @@ To test your extension end to end, you will create a new MakeCode project to int
 3. Instruct MakeCode to load your simulator extension from the local dev server by adding the `simxdev` URL parameter, e.g.:
     
     ```
-    http://localhost:3232/index.html?simexdev#editor
+    http://localhost:3232/index.html?simxdev#editor
     ```
 
 > [!NOTE]
