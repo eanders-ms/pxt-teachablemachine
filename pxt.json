@@ -21,6 +21,5 @@
     "supportedTargets": [
         "arcade"
     ],
-    "preferredEditor": "tsprj",
-    "version": "0.0.1"
+    "preferredEditor": "tsprj"
 }
