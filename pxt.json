@@ -1,27 +1,26 @@
 {
-    "name": "pxt-simx-sample",
+    "name": "pxt-teachablemachine",
     "description": "",
     "dependencies": {
-        "core": "*",
-        "radio": "*",
-        "microphone": "*"
+        "device": "*"
     },
     "files": [
         "main.blocks",
         "main.ts",
         "README.md",
-        "custom.ts"
+        "custom.ts",
+        "assets.json"
+        
     ],
     "testFiles": [
         "test.ts"
     ],
     "targetVersions": {
-        "target": "7.0.42",
-        "targetId": "microbit"
+        "target": "2.1.11",
+        "targetId": "arcade"
     },
     "supportedTargets": [
-        "microbit"
+        "arcade"
     ],
-    "preferredEditor": "tsprj",
-    "version": "0.0.2"
+    "preferredEditor": "tsprj"
 }
