@@ -10,7 +10,6 @@
         "README.md",
         "custom.ts",
         "assets.json"
-        
     ],
     "testFiles": [
         "test.ts"
@@ -22,5 +21,6 @@
     "supportedTargets": [
         "arcade"
     ],
-    "preferredEditor": "tsprj"
+    "preferredEditor": "tsprj",
+    "version": "0.0.1"
 }
