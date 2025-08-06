@@ -1,6 +1,5 @@
 namespace SimxSample {
-    // 🛠️ TASK: Update this to your project's channel.
-    const SIMX_CHANNEL = "microsoft/pxt-simx-sample"
+    const SIMX_CHANNEL = "eanders-ms/pxt-teachablemachine"
 
     //% block
     export function sendString(s: string) {
