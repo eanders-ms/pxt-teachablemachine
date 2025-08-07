@@ -1,4 +1,4 @@
-//% namespace="Teachable Machine"
+//% color="#1967D2"
 namespace Teachable_Machine {
     const SIMX_CHANNEL = "eanders-ms/pxt-teachablemachine"
 
