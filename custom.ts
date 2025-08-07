@@ -1,12 +1,8 @@
-namespace SimxSample {
+//% namespace="Teachable Machine"
+namespace Teachable_Machine {
     const SIMX_CHANNEL = "eanders-ms/pxt-teachablemachine"
 
-    //% block
-    export function sendString(s: string) {
-        const msg = {
-            type: "string",
-            value: s
-        }
+    function postExtensionMessage(msg: any) {
         control.simmessages.send(SIMX_CHANNEL, Buffer.fromUTF8(JSON.stringify(msg)), false);
     }
 
@@ -23,8 +19,15 @@ namespace SimxSample {
         const msg = JSON.parse(s);
         if (!msg.type) return;
         switch (msg.type) {
-            case "string": {
-                if (stringMessageHandler) stringMessageHandler(msg.value);
+            case "hello": {
+                postExtensionMessage({ type: "init" });
+                break;
+            }
+            case "ping": {
+                postExtensionMessage({ type: "pong" });
+                break;
+            }
+            case "pong": {
                 break;
             }
         }
@@ -36,8 +39,8 @@ namespace SimxSample {
     //% shim=TD_NOOP
     function registerSimx() {
         control.simmessages.onReceived(SIMX_CHANNEL, handleSimxMessage)
-        const msg = { type: "init" };
-        control.simmessages.send(SIMX_CHANNEL, Buffer.fromUTF8(JSON.stringify(msg)), false);
+        // Posting this message will trigger load of the simx. It is unlikely to be received due to race conditions.
+        postExtensionMessage({ type: "init" });
     }
 
     // Register simulator extension on load
