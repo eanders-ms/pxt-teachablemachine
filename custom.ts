@@ -40,6 +40,16 @@ namespace Teachable_Machine {
         poseHandlers.push(handler);
     }
 
+    //% block="stop model $model=variables_get(model)"
+    export function stopModel(model: string) {
+        // TODO
+    }
+
+    //% block="start model $model=variables_get(model)"
+    export function startModel(model: string) {
+        // TODO
+    }
+
     //% block="get prediction for label $label from model $model=variables_get(model)"
     //% blockSetVariable=prediction
     //% label.defl="(class label)"
