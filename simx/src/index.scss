@@ -7,52 +7,52 @@
 
 /* Google Sans Font Face Definitions */
 @font-face {
-    font-family: 'Google Sans';
+    font-family: "Google Sans";
     font-style: normal;
     font-weight: 400;
     font-display: swap;
-    src: local('Google Sans Regular'), local('GoogleSans-Regular');
+    src: local("Google Sans Regular"), local("GoogleSans-Regular");
 }
 
 @font-face {
-    font-family: 'Google Sans';
+    font-family: "Google Sans";
     font-style: normal;
     font-weight: 500;
     font-display: swap;
-    src: local('Google Sans Medium'), local('GoogleSans-Medium');
+    src: local("Google Sans Medium"), local("GoogleSans-Medium");
 }
 
 @font-face {
-    font-family: 'Google Sans';
+    font-family: "Google Sans";
     font-style: normal;
     font-weight: 600;
     font-display: swap;
-    src: local('Google Sans Semi Bold'), local('GoogleSans-SemiBold');
+    src: local("Google Sans Semi Bold"), local("GoogleSans-SemiBold");
 }
 
 @font-face {
-    font-family: 'Google Sans';
+    font-family: "Google Sans";
     font-style: normal;
     font-weight: 700;
     font-display: swap;
-    src: local('Google Sans Bold'), local('GoogleSans-Bold');
+    src: local("Google Sans Bold"), local("GoogleSans-Bold");
 }
 
 /* Roboto Mono Font Face Definitions */
 @font-face {
-    font-family: 'Roboto Mono';
+    font-family: "Roboto Mono";
     font-style: normal;
     font-weight: 400;
     font-display: swap;
-    src: local('Roboto Mono'), local('RobotoMono-Regular');
+    src: local("Roboto Mono"), local("RobotoMono-Regular");
 }
 
 @font-face {
-    font-family: 'Roboto Mono';
+    font-family: "Roboto Mono";
     font-style: normal;
     font-weight: 500;
     font-display: swap;
-    src: local('Roboto Mono Medium'), local('RobotoMono-Medium');
+    src: local("Roboto Mono Medium"), local("RobotoMono-Medium");
 }
 
 /*******************************/
@@ -66,7 +66,7 @@
     --above-frame-zindex: 50;
     --modal-dimmer-zindex: 100;
     --fullscreen-modal-zindex: 90;
-    --pxt-neutral-background1: #E8EAED;
+    --pxt-neutral-background1: #e8eaed;
 }
 
 /*******************************/
