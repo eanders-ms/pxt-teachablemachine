@@ -5,23 +5,24 @@ declare global {
     // ---- SHARED TYPES ----
     interface ImageOrPoseMetadata {
         tfjsVersion: string;
-        tmVersion?: string;
-        packageVersion: string;
         packageName: string;
-        modelName: string;
-        timeStamp?: string;
-        labels?: string[];
-        userMetadata?: {};
-        grayscale?: boolean;
-        imageSize?: number;
+        packageVersion: string;
+        labels: string[];
+        imageSize: number;
+        weightUrl?: string;
+        modelUrl?: string;
     }
 
     interface SoundMetadata {
         tfjsSpeechCommandsVersion: string;
+        modelName: string;
+        timeSteps: number;
         wordLabels: string[];
+        vocab: string[];
+        frameSize: number;
+        sampleRate: number;
+        keywords?: string[];
     }
-
-    type AnyMetadata = ImageOrPoseMetadata | SoundMetadata;
 
     type ClassifierInputSource = HTMLImageElement | HTMLCanvasElement | HTMLVideoElement | ImageBitmap;
 

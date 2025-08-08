@@ -1,11 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { classList } from "@/utils";
 import css from "./App.module.scss";
 import { ModelItem, ListItem } from "@/components";
+import { modelManager } from "@/services/modelManager";
+// Initialize the external API
+import "@/api";
 
 export function App() {
     const [items, setItems] = useState<ListItem[]>([]);
     const [inputValue, setInputValue] = useState("");
+
+    // Set up model manager callbacks
+    useEffect(() => {
+        modelManager.onModelLoadRequest((url: string) => {
+            addItem(url);
+        });
+
+        modelManager.onModelDeleteRequest((modelId: string) => {
+            deleteItem(modelId);
+        });
+
+        // Cleanup on unmount
+        return () => {
+            modelManager.onModelLoadRequest(() => {});
+            modelManager.onModelDeleteRequest(() => {});
+        };
+    }, []);
 
     const addItem = async (url: string) => {
         if (!url.trim()) return;

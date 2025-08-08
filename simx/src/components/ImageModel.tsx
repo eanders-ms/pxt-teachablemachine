@@ -3,6 +3,7 @@ import { classList } from "@/utils";
 import css from "../App.module.scss";
 import { ImageOrPoseItem } from "./types";
 import { sendPredictions, Prediction } from "@/extension";
+import { modelManager, ModelControls } from "@/services/modelManager";
 
 interface ImageModelProps {
     item: ImageOrPoseItem;
@@ -21,6 +22,24 @@ export function ImageModel({ item }: ImageModelProps) {
     const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
     const [selectedCameraId, setSelectedCameraId] = useState<string>("");
     const [flipCamera, setFlipCamera] = useState<boolean>(true);
+
+    // Register with model manager
+    useEffect(() => {
+        const controls: ModelControls = {
+            start: handleStart,
+            stop: handleStop,
+            isRunning: () => runningRef.current,
+            isLoaded: () => modelLoaded && imageModelRef.current !== null,
+        };
+
+        if (modelLoaded) {
+            modelManager.registerModel(item, controls);
+        }
+
+        return () => {
+            modelManager.unregisterModel(item.id);
+        };
+    }, [modelLoaded, item]);
 
     useEffect(() => {
         if (modelLoaded || !canvasContainerRef.current) return;

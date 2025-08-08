@@ -5,6 +5,28 @@ export type ActionBase<Type extends string, Payload = unknown> = {
 
 export type ModalOptions = {};
 
+// Teachable Machine Metadata Types
+export interface ImageOrPoseMetadata {
+    tfjsVersion: string;
+    packageName: string;
+    packageVersion: string;
+    labels: string[];
+    imageSize: number;
+    weightUrl?: string;
+    modelUrl?: string;
+}
+
+export interface SoundMetadata {
+    tfjsSpeechCommandsVersion: string;
+    modelName: string;
+    timeSteps: number;
+    wordLabels: string[];
+    vocab: string[];
+    frameSize: number;
+    sampleRate: number;
+    keywords?: string[];
+}
+
 // MakeCode Simulator Message Types
 // See https://github.com/microsoft/pxt/blob/master/pxtsim/embed.ts
 
