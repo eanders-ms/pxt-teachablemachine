@@ -1,5 +1,6 @@
 {
     "name": "pxt-teachablemachine",
+    "version": "0.0.2",
     "description": "",
     "dependencies": {
         "device": "*"
@@ -21,6 +22,5 @@
     "supportedTargets": [
         "arcade"
     ],
-    "preferredEditor": "blocksprj",
-    "version": "0.0.2"
+    "preferredEditor": "blocksprj"
 }
