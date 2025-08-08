@@ -21,7 +21,7 @@ export function PoseModel({ item }: PoseModelProps) {
     const labelsRef = useRef<Prediction[]>([]);
     const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
     const [selectedCameraId, setSelectedCameraId] = useState<string>("");
-    const [flipCamera, setFlipCamera] = useState<boolean>(false);
+    const [flipCamera, setFlipCamera] = useState<boolean>(true);
 
     useEffect(() => {
         if (modelLoaded || !canvasContainerRef.current) return;
@@ -137,14 +137,68 @@ export function PoseModel({ item }: PoseModelProps) {
                     // Clear the pose canvas
                     ctx.clearRect(0, 0, poseCanvasRef.current.width, poseCanvasRef.current.height);
 
-                    // Draw pose keypoints and skeleton
+                    // Calculate scale factor and positioning based on actual displayed size vs canvas size
+                    const webcamCanvas = webcamRef.current.canvas;
+                    const displayedRect = webcamCanvas.getBoundingClientRect();
+
+                    // Calculate the actual video dimensions within the displayed canvas
+                    // The video maintains aspect ratio and is centered due to object-fit: contain
+                    const videoAspectRatio = webcamCanvas.width / webcamCanvas.height;
+                    const displayAspectRatio = displayedRect.width / displayedRect.height;
+
+                    let videoDisplayWidth, videoDisplayHeight, offsetX, offsetY;
+
+                    if (displayAspectRatio > videoAspectRatio) {
+                        // Display is wider than video - video will have margins on left/right
+                        videoDisplayHeight = displayedRect.height;
+                        videoDisplayWidth = videoDisplayHeight * videoAspectRatio;
+                        offsetX = (displayedRect.width - videoDisplayWidth) / 2;
+                        offsetY = 0;
+                    } else {
+                        // Display is taller than video - video will have margins on top/bottom
+                        videoDisplayWidth = displayedRect.width;
+                        videoDisplayHeight = videoDisplayWidth / videoAspectRatio;
+                        offsetX = 0;
+                        offsetY = (displayedRect.height - videoDisplayHeight) / 2;
+                    }
+
+                    const scaleX = videoDisplayWidth / webcamCanvas.width;
+                    const scaleY = videoDisplayHeight / webcamCanvas.height;
+
+                    // Update overlay canvas size to match displayed webcam size
+                    const overlayCanvas = poseCanvasRef.current;
+                    overlayCanvas.width = displayedRect.width;
+                    overlayCanvas.height = displayedRect.height;
+                    overlayCanvas.style.width = `${displayedRect.width}px`;
+                    overlayCanvas.style.height = `${displayedRect.height}px`;
+
+                    // Draw pose keypoints and skeleton with proper scaling
                     const minConfidence = 0.15;
 
-                    // Draw skeleton (connections between keypoints)
-                    window.tmPose.drawSkeleton(pose.keypoints, minConfidence, ctx, 4, "#00FFFF");
+                    // If camera is flipped, we need to mirror the keypoints horizontally
+                    let adjustedKeypoints = pose.keypoints;
+                    if (flipCamera) {
+                        adjustedKeypoints = pose.keypoints.map((keypoint) => ({
+                            ...keypoint,
+                            position: {
+                                x: webcamCanvas.width - keypoint.position.x,
+                                y: keypoint.position.y,
+                            },
+                        }));
+                    }
 
-                    // Draw keypoints (individual joints)
-                    window.tmPose.drawKeypoints(pose.keypoints, minConfidence, ctx, 6, "#FF0000", "#FFFFFF");
+                    // Apply scaling and offset to keypoints for proper positioning
+                    const finalKeypoints = adjustedKeypoints.map((keypoint) => ({
+                        ...keypoint,
+                        position: {
+                            x: keypoint.position.x * scaleX + offsetX,
+                            y: keypoint.position.y * scaleY + offsetY,
+                        },
+                    }));
+
+                    // Draw skeleton and keypoints with positioned coordinates (scale = 1 since we already scaled)
+                    window.tmPose.drawSkeleton(finalKeypoints, minConfidence, ctx, 4, "#00FFFF", 1);
+                    window.tmPose.drawKeypoints(finalKeypoints, minConfidence, ctx, 6, "#FF0000", "#FFFFFF", 1);
                 }
             } catch (error) {
                 console.error("Error during pose prediction:", error);
@@ -190,8 +244,7 @@ export function PoseModel({ item }: PoseModelProps) {
 
                 // Create and add pose overlay canvas
                 const poseCanvas = document.createElement("canvas");
-                poseCanvas.width = 400;
-                poseCanvas.height = 400;
+                // Size will be set dynamically in predict() based on displayed webcam size
                 poseCanvas.style.position = "absolute";
                 poseCanvas.style.top = "0";
                 poseCanvas.style.left = "0";

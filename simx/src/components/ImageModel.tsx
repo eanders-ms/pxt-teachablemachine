@@ -20,7 +20,7 @@ export function ImageModel({ item }: ImageModelProps) {
     const labelsRef = useRef<Prediction[]>([]);
     const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
     const [selectedCameraId, setSelectedCameraId] = useState<string>("");
-    const [flipCamera, setFlipCamera] = useState<boolean>(false);
+    const [flipCamera, setFlipCamera] = useState<boolean>(true);
 
     useEffect(() => {
         if (modelLoaded || !canvasContainerRef.current) return;
