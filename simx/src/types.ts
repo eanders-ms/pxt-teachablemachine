@@ -1,3 +1,10 @@
+export type ActionBase<Type extends string, Payload = unknown> = {
+    type: Type;
+    payload: Payload;
+};
+
+export type ModalOptions = {};
+
 // MakeCode Simulator Message Types
 // See https://github.com/microsoft/pxt/blob/master/pxtsim/embed.ts
 

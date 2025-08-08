@@ -1,165 +1,428 @@
-import { useRef, useEffect } from "react"
-import { SimulatorMessage, SimulatorControlMessage } from "./external/types"
-import "./App.css"
+import { useState, useEffect, useRef } from "react";
+import { classList } from "@/utils";
+import css from "./App.module.scss";
 
-// This extension's message channel. Must match the extension's simx registration key in MakeCode's `targetconfig.json`
-// Value is typically in the form of "orgname/reponame".
-// 🛠️ TASK: Update this to your project's channel.
-const SIMX_CHANNEL = "microsoft/pxt-simx-sample"
-
-// Messages sent to/from this project's code extension. This interface is application-defined and can be anything.
-// 🛠️ TASK: Modify and extend these as needed for your project's scenario. 
-type InitExtensionMessage = {
-    type: "init"
-}
-type StringExtensionMessage = {
-    type: "string"
-    value: string
-}
-type ExtensionMessage = InitExtensionMessage | StringExtensionMessage
-
-// Sends a message to this project's code extension running in the MakeCode simulator
-function postExtensionMessage(msg: ExtensionMessage) {
-    const payload = new TextEncoder().encode(JSON.stringify(msg))
-    const packet: Partial<SimulatorControlMessage> = {
-        type: "messagepacket",
-        channel: SIMX_CHANNEL,
-        data: payload,
-    }
-    window.parent.postMessage(packet, "*")
+interface ListItem {
+    id: string;
+    url: string;
 }
 
-// Colors for the background
-const GREEN = "#3AFFB3"
-const BLUE = "#3ADCFF"
-const YELLOW = "#FFD43A"
-const RED = "#FF3A54"
-const COLORS = [GREEN, BLUE, YELLOW, RED]
+interface ListItemProps {
+    item: ListItem;
+    onDelete: (id: string) => void;
+}
 
-function setBackgroundColor() {
-    // Assign a random background color to the root div
-    const root = document.getElementById("root")
-    if (root) {
-        root.style.backgroundColor = COLORS[Math.floor(Math.random() * COLORS.length)]
-    }
+interface ModelLabel {
+    title: string;
+    confidence: number;
+}
+
+function ModelItem({ item, onDelete }: ListItemProps) {
+    const [modelName, setModelName] = useState("loading...");
+    const [modelType, setModelType] = useState<string | undefined>(undefined);
+    const [labels, setLabels] = useState<ModelLabel[]>([]);
+    const [running, setRunning] = useState(false);
+    const [modelLoaded, setModelLoaded] = useState(false);
+    const imageModelRef = useRef<tmImage.Model | null>(null);
+    const webcamRef = useRef<tmImage.Webcam | null>(null);
+    const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+    const animationFrameRef = useRef<number | null>(null);
+    const runningRef = useRef<boolean>(false); // Add ref for running state
+    const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+    const [selectedCameraId, setSelectedCameraId] = useState<string>("");
+    const [flipCamera, setFlipCamera] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (modelLoaded || !canvasContainerRef.current) return;
+        console.log("Loading model from URL:", item.url);
+        setModelLoaded(true); // Set model as loaded early to prevent multiple loads
+        const resourceUrl = new URL(item.url);
+        let pathname = resourceUrl.pathname;
+        if (pathname.endsWith("/")) {
+            pathname = pathname.slice(0, -1);
+        }
+        const loadModel = async () => {
+            try {
+                console.log("Fetching model files...");
+                const model = await window.tmImage.load(
+                    resourceUrl.toString() + "model.json",
+                    resourceUrl.toString() + "metadata.json"
+                );
+                console.log("Model loaded successfully:", model);
+                return model;
+            } catch (error) {
+                console.error("Error loading model:", error);
+                throw error;
+            }
+        };
+        loadModel()
+            .then((model) => {
+                const modelName = pathname.split("/").pop() || "Untitled Model";
+                const modelType = model._metadata["packageName"]?.split("/").pop() || "Unknown";
+                console.log("Model details - Name:", modelName, "Type:", modelType);
+
+                setModelName(modelName);
+                setModelType(modelType);
+                const labelsArray: ModelLabel[] =
+                    model._metadata["labels"]?.map((label: string) => ({
+                        title: label,
+                        confidence: 0,
+                    })) || [];
+                console.log("Model labels:", labelsArray);
+                setLabels(labelsArray);
+                imageModelRef.current = model;
+            })
+            .catch((error) => {
+                console.error("Failed to load model:", error);
+                setModelLoaded(false);
+            });
+        // Load the image model if available
+    }, [item.url, modelLoaded]);
+
+    // Enumerate available cameras
+    useEffect(() => {
+        const getCameras = async () => {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter((device) => device.kind === "videoinput");
+                setAvailableCameras(videoDevices);
+
+                // Set default camera if none selected
+                if (videoDevices.length > 0 && !selectedCameraId) {
+                    setSelectedCameraId(videoDevices[0].deviceId);
+                }
+            } catch (error) {
+                console.error("Error enumerating cameras:", error);
+            }
+        };
+
+        getCameras();
+    }, [selectedCameraId]);
+
+    const predict = async () => {
+        if (webcamRef.current && imageModelRef.current && webcamRef.current.canvas) {
+            try {
+                webcamRef.current.update();
+                const prediction = await imageModelRef.current.predict(webcamRef.current.canvas);
+
+                setLabels((prevLabels) =>
+                    prevLabels.map((label, index) => ({
+                        ...label,
+                        confidence: prediction[index] ? Number(prediction[index].probability.toFixed(3)) : 0,
+                    }))
+                );
+            } catch (error) {
+                console.error("Error during prediction:", error);
+            }
+        } else {
+            console.log("Predict skipped - missing dependencies");
+        }
+    };
+
+    const animationLoop = async () => {
+        if (runningRef.current) {
+            await predict();
+            animationFrameRef.current = requestAnimationFrame(animationLoop);
+        } else {
+            console.log("Animation loop stopped - running is false");
+        }
+    };
+
+    const handleDelete = () => {
+        if (running) {
+            handleStop();
+        }
+        onDelete(item.id);
+    };
+
+    const handleStart = async () => {
+        if (modelLoaded && canvasContainerRef.current) {
+            try {
+                console.log("Starting webcam with camera:", selectedCameraId);
+
+                setRunning(true);
+                runningRef.current = true;
+
+                // It isn't correct, but I'm making the webcam canvas square in order to get the full height of the video. I don't know why I have to do this. Width is clipped.
+                const webcamInstance = new window.tmImage.Webcam(640, 640, flipCamera);
+                webcamRef.current = webcamInstance;
+
+                const constraints: MediaTrackConstraints | undefined = selectedCameraId
+                    ? { deviceId: { exact: selectedCameraId } }
+                    : undefined;
+
+                console.log("Setting up webcam with constraints:", constraints);
+                await webcamRef.current.setup(constraints);
+                console.log("Webcam setup complete");
+
+                canvasContainerRef.current.innerHTML = "";
+                if (webcamRef.current.canvas) {
+                    canvasContainerRef.current.appendChild(webcamRef.current.canvas);
+                } else {
+                    console.error("No canvas found on webcam instance");
+                }
+
+                await webcamRef.current.play();
+                console.log("Webcam play started");
+
+                // Wait a bit for video metadata to load, then log dimensions
+                setTimeout(() => {
+                    if (webcamRef.current?.webcam) {
+                        const video = webcamRef.current.webcam;
+                        console.log("Video element dimensions:", {
+                            videoWidth: video.videoWidth,
+                            videoHeight: video.videoHeight,
+                            clientWidth: video.clientWidth,
+                            clientHeight: video.clientHeight,
+                            aspectRatio: video.videoWidth && video.videoHeight ? 
+                                (video.videoWidth / video.videoHeight).toFixed(3) : "N/A"
+                        });
+
+                        // Get the underlying MediaStream dimensions
+                        if (video.srcObject && video.srcObject instanceof MediaStream) {
+                            const stream = video.srcObject as MediaStream;
+                            const videoTracks = stream.getVideoTracks();
+                            if (videoTracks.length > 0) {
+                                const track = videoTracks[0];
+                                const settings = track.getSettings();
+                                console.log("MediaStream track settings:", {
+                                    width: settings.width,
+                                    height: settings.height,
+                                    aspectRatio: settings.width && settings.height ? 
+                                        (settings.width / settings.height).toFixed(3) : "N/A",
+                                    frameRate: settings.frameRate,
+                                    deviceId: settings.deviceId,
+                                    facingMode: settings.facingMode
+                                });
+
+                                const constraints = track.getConstraints();
+                                console.log("MediaStream track constraints:", constraints);
+
+                                const capabilities = track.getCapabilities();
+                                console.log("MediaStream track capabilities:", {
+                                    width: capabilities.width,
+                                    height: capabilities.height,
+                                    aspectRatio: capabilities.aspectRatio,
+                                    frameRate: capabilities.frameRate
+                                });
+                            }
+                        }
+                    }
+
+                    if (webcamRef.current?.canvas) {
+                        const canvas = webcamRef.current.canvas;
+                        console.log("Canvas dimensions:", {
+                            width: canvas.width,
+                            height: canvas.height,
+                            aspectRatio: canvas.width && canvas.height ? 
+                                (canvas.width / canvas.height).toFixed(3) : "N/A"
+                        });
+                    }
+                }, 500); // Wait 500ms for video metadata to load
+
+                animationFrameRef.current = requestAnimationFrame(animationLoop);
+            } catch (error) {
+                console.error("Error starting webcam:", error);
+                setRunning(false);
+                runningRef.current = false;
+                // Clean up on error
+                if (canvasContainerRef.current) {
+                    canvasContainerRef.current.innerHTML = "";
+                }
+            }
+        } else {
+            console.log(
+                "Cannot start webcam - modelLoaded:",
+                modelLoaded,
+                "canvasContainerRef:",
+                !!canvasContainerRef.current
+            );
+        }
+    };
+    const handleStop = () => {
+        setRunning(false);
+        runningRef.current = false;
+
+        // Cancel the animation frame
+        if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+        }
+
+        try {
+            webcamRef.current?.stop();
+        } catch {}
+        if (canvasContainerRef.current) {
+            canvasContainerRef.current.innerHTML = "";
+        }
+        webcamRef.current = null;
+    };
+
+    return (
+        <div className={css["list-item"]}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+                <span style={{ fontSize: "12px", color: "#666" }}>{modelType}</span>
+                <span style={{ flex: 1 }} />
+                <span style={{ fontSize: "10px", color: "#666" }}>ID: {modelName}</span>
+                <span style={{ flex: 1 }} />
+                <button onClick={handleDelete} className={classList(css["btn"], css["gray"])}>
+                    Delete
+                </button>
+            </div>
+            <span style={{ paddingTop: "4px" }} />
+
+            {/* Camera selection dropdown */}
+            <div className={css["camera-selection"]}>
+                <label htmlFor={`camera-select-${item.id}`} style={{ fontSize: "12px", marginRight: "8px" }}>
+                    Camera:
+                </label>
+                <select
+                    id={`camera-select-${item.id}`}
+                    value={selectedCameraId}
+                    onChange={(e) => setSelectedCameraId(e.target.value)}
+                    disabled={running}
+                    style={{ fontSize: "12px", padding: "2px 4px" }}
+                >
+                    {availableCameras.map((camera, index) => (
+                        <option key={camera.deviceId} value={camera.deviceId}>
+                            {camera.label || `Camera ${index + 1}`}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <span style={{ paddingTop: "4px" }} />
+
+            {/* Camera flip checkbox */}
+            <div className={css["camera-selection"]}>
+                <label htmlFor={`flip-camera-${item.id}`} style={{ fontSize: "12px", marginRight: "8px" }}>
+                    <input
+                        type="checkbox"
+                        id={`flip-camera-${item.id}`}
+                        checked={flipCamera}
+                        onChange={(e) => {
+                            setFlipCamera(e.target.checked);
+                            // Update the webcam flip setting if running
+                            if (webcamRef.current) {
+                                webcamRef.current.flip = e.target.checked;
+                            }
+                        }}
+                        style={{ marginRight: "4px" }}
+                    />
+                    Flip camera horizontally
+                </label>
+            </div>
+            <span style={{ paddingTop: "4px" }} />
+
+            <div className={css["controls"]}>
+                {!running ? (
+                    <button onClick={handleStart} className={classList(css["btn"], css["green"])}>
+                        Start
+                    </button>
+                ) : (
+                    <button onClick={handleStop} className={classList(css["btn"], css["red"])}>
+                        Stop
+                    </button>
+                )}
+            </div>
+            {modelLoaded && (
+                <div className={css["model-labels"]}>
+                    {labels.map((label) => (
+                        <p key={label.title} style={{ fontSize: "12px", fontWeight: "bold" }}>
+                            {label.title}: {label.confidence}
+                        </p>
+                    ))}
+                </div>
+            )}
+            <div ref={canvasContainerRef} className={css["webcam-container"]} />
+        </div>
+    );
 }
 
 export function App() {
-    // Refs to the DOM elements we want to interact with programmatically
-    const inputRef = useRef<HTMLInputElement>(null)
-    const logRef = useRef<HTMLTextAreaElement>(null)
+    const [items, setItems] = useState<ListItem[]>([]);
+    const [nextId, setNextId] = useState(1);
+    const [inputValue, setInputValue] = useState("");
 
-    // Set a random background color on startup
-    useEffect(() => {
-        setBackgroundColor()
-    }, [])
+    const addItem = (url: string) => {
+        if (!url.trim()) return; // Don't add empty URLs
 
-    // Handle send button click
-    const handleSendClick = () => {
-        if (inputRef.current) {
-            const message = inputRef.current.value
-            inputRef.current.value = ""
-            postExtensionMessage({ type: "string", value: message })
-        }
-    }
+        const newItem: ListItem = {
+            id: `item-${nextId}`,
+            url: url,
+        };
+        setItems((prev) => [...prev, newItem]);
+        setNextId((prev) => prev + 1);
+        setInputValue(""); // Clear input after adding
+    };
 
-    // Handle Enter key press on input box
-    const handleInputKeyDown = (ev: React.KeyboardEvent) => {
-        if (ev.key === "Enter") {
-            handleSendClick()
-        }
-    }
+    const deleteItem = (id: string) => {
+        setItems((prev) => prev.filter((item) => item.id !== id));
+    };
 
-    // Handle messages from the MakeCode simulator
-    useEffect(() => {
-        // Handle a message from this project's code extension
-        const receiveExtensionMessage = (msg: ExtensionMessage) => {
-            // 🛠️ TASK: Handle messages from your code extension here
-            switch (msg.type) {
-                case "init": {
-                    // Clear the log when the extension is initialized
-                    if (logRef.current) {
-                        logRef.current.value = ""
-                    }
-                    // Set a random background color when the extension is initialized
-                    setBackgroundColor()
-                    break
-                }
-                case "string": {
-                    // Append incoming message to the log
-                    if (logRef.current) {
-                        logRef.current.value += msg.value + "\n"
-                        logRef.current.scrollTop = logRef.current.scrollHeight
-                    }
-                    break
-                }
-                default: {
-                    const { type } = msg
-                    console.error("Received unknown extension message", type)
-                }
-            }
-        }
-
-        // Handle a SimulatorControlMessage from MakeCode
-        const receiveSimControlMessage = (simmsg: SimulatorControlMessage) => {
-            // Cross-frame communication is overly chatty right now, so we must filter out unwanted messages here.
-            // TODO (MakeCode): Clean up iframe messaging to reduce noise.
-            const srcFrameIndex = (simmsg.srcFrameIndex as number) ?? -1
-            const fromPrimarySim = srcFrameIndex === 0
-            if (!fromPrimarySim) {
-                // Ignore messages from other simulator extensions
-                return
-            }
-            if (simmsg.channel !== SIMX_CHANNEL) {
-                // Ignore messages on other channels
-                return
-            }
-            // looks like a message from our code extension
-            const data = new TextDecoder().decode(new Uint8Array(simmsg.data))
-            const msg = JSON.parse(data) as ExtensionMessage
-            receiveExtensionMessage(msg)
-        }
-
-        // Handle a SimulatorMessage from MakeCode
-        const receiveSimMessage = (simmsg: SimulatorMessage) => {
-            switch (simmsg.type) {
-                case "messagepacket":
-                    // looks like a SimulatorControlMessage
-                    return receiveSimControlMessage(simmsg as SimulatorControlMessage)
-                default:
-                    // This is here to reveal how many other kinds of messages are being sent.
-                    // TODO (MakeCode): Document the other message types. Some of them are useful.
-                    // 🛠️ TASK: Handle other message types as needed.
-                    // 🛠️ TASK: Comment out this line in a real project.
-                    console.log("Received unknown simmsg", simmsg.type)
-            }
-        }
-
-        // Handle messages from the parent window
-        const receiveMessage = (ev: MessageEvent) => {
-            const { data } = ev
-            const { type } = data
-            if (!data || !type) return
-            // Looks like a SimulatorMessage from MakeCode
-            receiveSimMessage(data as SimulatorMessage)
-        }
-
-        window.addEventListener("message", receiveMessage)
-        return () => window.removeEventListener("message", receiveMessage)
-    }, [])
+    const handleAddClick = () => {
+        addItem(inputValue);
+    };
 
     return (
-        <div className="app">
-            <div className="label">Send a message to your microbit:</div>
-            <div className="send">
-                <input className="send" type="text" ref={inputRef} onKeyDown={handleInputKeyDown} />
-                <button className="send" onClick={handleSendClick}>
-                    Send
-                </button>
+        <div className={css["app"]}>
+            <div className={css["header"]}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                    <h4 style={{ margin: 0 }}>Teachable Machine</h4>
+                    <a 
+                        href="https://teachablemachine.withgoogle.com/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ 
+                            color: "#666", 
+                            textDecoration: "none",
+                            display: "flex",
+                            alignItems: "center"
+                        }}
+                        title="Visit Teachable Machine website"
+                    >
+                        <svg 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                            style={{ opacity: 0.7 }}
+                        >
+                            <path 
+                                d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" 
+                                stroke="currentColor" 
+                                strokeWidth="2" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                    </a>
+                </div>
             </div>
-            <div className="divider"></div>
-            <div className="label">From your microbit:</div>
-            <textarea className="log" readOnly ref={logRef}></textarea>
+            <div className={css["body"]}>
+                <div className={css["controls"]}>
+                    <div style={{ flex: 1 }}>
+                        <input
+                            type="text"
+                            placeholder="Model URL"
+                            className={css["model-url"]}
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <button onClick={handleAddClick} className={classList(css["btn"], css["blue"])}>
+                            Add
+                        </button>
+                    </div>
+                </div>
+                <span style={{ paddingTop: "4px" }} />
+                <div className={css["item-list"]}>
+                    {items.map((item) => (
+                        <ModelItem key={item.id} item={item} onDelete={deleteItem} />
+                    ))}
+                </div>
+            </div>
         </div>
-    )
+    );
 }
