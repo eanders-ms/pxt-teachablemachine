@@ -2,16 +2,59 @@
 namespace Teachable_Machine {
     const SIMX_CHANNEL = "eanders-ms/pxt-teachablemachine"
 
+    interface Prediction {
+        name: string;
+        confidence: number;
+    }
+
+    interface PredictionMessage {
+        type: "predictions";
+        modelType: "image" | "pose" | "sound";
+        predictions: Prediction[];
+    }
+
     function postExtensionMessage(msg: any) {
         control.simmessages.send(SIMX_CHANNEL, Buffer.fromUTF8(JSON.stringify(msg)), false);
     }
 
-    let stringMessageHandler: (val: string) => void;
+    const poseHandlers: ((name: string, confidence: number) => void)[] = [];
+    const imageHandlers: ((name: string, confidence: number) => void)[] = [];
+    const soundHandlers: ((name: string, confidence: number) => void)[] = [];
 
     //% block
     //% draggableParameters="reporter"
-    export function onReceiveString(handler: (val: string) => void) {
-        stringMessageHandler = handler;
+    export function onPosePrediction(handler: (name: string, confidence: number) => void) {
+        poseHandlers.push(handler);
+    }
+
+    //% block
+    //% draggableParameters="reporter"
+    export function onImagePrediction(handler: (name: string, confidence: number) => void) {
+        imageHandlers.push(handler);
+    }
+
+    //% block
+    //% draggableParameters="reporter"
+    export function onSoundPrediction(handler: (name: string, confidence: number) => void) {
+        soundHandlers.push(handler);
+    }
+
+    function emitPosePredictions(predictions: Prediction[]) {
+        predictions.forEach(prediction => {
+            poseHandlers.forEach(handler => handler(prediction.name, prediction.confidence));
+        });
+    }
+
+    function emitImagePredictions(predictions: Prediction[]) {
+        predictions.forEach(prediction => {
+            imageHandlers.forEach(handler => handler(prediction.name, prediction.confidence));
+        });
+    }
+
+    function emitSoundPredictions(predictions: Prediction[]) {
+        predictions.forEach(prediction => {
+            soundHandlers.forEach(handler => handler(prediction.name, prediction.confidence));
+        });
     }
 
     function handleSimxMessage(b: Buffer) {
@@ -29,6 +72,23 @@ namespace Teachable_Machine {
             }
             case "pong": {
                 break;
+            }
+            case "predictions": {
+                const predMsg = msg as PredictionMessage;
+                switch (predMsg.modelType) {
+                    case "pose": {
+                        emitPosePredictions(predMsg.predictions);
+                        break;
+                    }
+                    case "image": {
+                        emitImagePredictions(predMsg.predictions);
+                        break;
+                    }
+                    case "sound": {
+                        emitSoundPredictions(predMsg.predictions);
+                        break;
+                    }
+                }
             }
         }
     }
