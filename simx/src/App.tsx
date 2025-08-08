@@ -129,7 +129,7 @@ export function App() {
                         }}
                         title="Visit Teachable Machine website"
                     >
-                        <span style={{ paddingRight: "2px" }}>Create</span>
+                        <span style={{ paddingRight: "2px", whiteSpace: "nowrap" }}>Create</span>
                         <span style={{ minWidth: "max-content" }}>
                             <svg
                                 width="12"
